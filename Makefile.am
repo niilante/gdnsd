@@ -107,6 +107,8 @@ sbin_PROGRAMS += src/gdnsd
 src_gdnsd_SOURCES = \
 	src/main.c \
 	src/main.h \
+	src/daemon.c \
+	src/daemon.h \
 	src/conf.c \
 	src/conf.h \
 	src/zsrc_djb.c \
@@ -267,8 +269,7 @@ xHEADERS_INST = \
 	include/gdnsd/paths.h \
 	include/gdnsd/file.h \
 	include/gdnsd/alloc.h \
-	include/gdnsd/prcu.h \
-	include/gdnsd/dmn.h
+	include/gdnsd/prcu.h
 
 # include/gdnsd-prot/foo.h define shlib interfaces private to libgdnsd + gdnsd
 # libgdnsd/foo.h define non-shlib interfaces private to libgdnsd only
@@ -277,8 +278,6 @@ xHEADERS_ALL = \
 	include/gdnsd-prot/misc.h \
 	include/gdnsd-prot/mon.h \
 	include/gdnsd-prot/plugapi.h \
-	libgdnsd/misc.h \
-	libgdnsd/net.h \
 	libgdnsd/plugapi.h
 
 libgdnsd_libgdnsd_la_SOURCES = \
@@ -292,9 +291,7 @@ libgdnsd_libgdnsd_la_SOURCES = \
 	libgdnsd/paths.c \
 	libgdnsd/file.c \
 	libgdnsd/plugapi.c \
-	libgdnsd/alloc.c \
-	libgdnsd/dmn.c \
-	libgdnsd/dmn_net.c
+	libgdnsd/alloc.c
 
 LIBGDNSD_PATHS = \
 	-DGDNSD_DEFPATH_CONFIG='"$(GDNSD_DEFPATH_CONFIG)"' \
