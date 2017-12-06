@@ -59,11 +59,7 @@ void gdnsd_mon_start(struct ev_loop* mon_loop);
 // statio.c calls these
 unsigned gdnsd_mon_stats_get_max_len(void);
 F_NONNULL
-unsigned gdnsd_mon_stats_out_csv(char* buf);
-F_NONNULL
 unsigned gdnsd_mon_stats_out_json(char* buf);
-F_NONNULL
-unsigned gdnsd_mon_stats_out_html(char* buf);
 
 #pragma GCC visibility pop
 

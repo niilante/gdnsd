@@ -104,9 +104,16 @@ static int action_status(csc_t* csc) {
 }
 
 F_NONNULL
-static int action_stats(csc_t* csc V_UNUSED) {
-    log_fatal("XXX Not yet implemented");
-    return(0);
+static int action_stats(csc_t* csc) {
+    char* resp_data;
+    csbuf_t req, resp;
+    memset(&req, 0, sizeof(req));
+    req.key = REQ_STAT;
+    if(csc_txn_getdata(csc, &req, &resp, &resp_data))
+        return 1;
+    fwrite(resp_data, 1, resp.d, stdout);
+    free(resp_data);
+    return 0;
 }
 
 /**** Commandline parsing and action selection ****/

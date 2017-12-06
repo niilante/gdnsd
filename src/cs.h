@@ -35,6 +35,7 @@ typedef union {
 
 // Legal values for "key"
 #define REQ_INFO 'I'
+#define REQ_STAT 'S'
 #define REQ_STOP 'X'
 #define RESP_ACK 'A'
 #define RESP_NAK 'N'
