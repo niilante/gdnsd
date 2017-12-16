@@ -88,7 +88,20 @@ void dnsio_udp_init(void) {
     sigaction(SIGUSR2, &sa, 0);
 }
 
-static bool has_mmsg(void);
+#ifdef USE_SENDMMSG
+
+// check for sendmmsg() actually working + desirable
+static bool use_mmsg(void) {
+    static int memoize = -1;
+    if(memoize == -1) {
+        /* this causes no harm and exits immediately */
+        sendmmsg(-1, 0, 0, 0);
+        memoize = (int)(errno != ENOSYS);
+    }
+    return (bool)memoize;
+}
+
+#endif
 
 static void udp_sock_opts_v4(const int sock V_UNUSED, const bool any_addr) {
     const int opt_one V_UNUSED = 1;
@@ -249,28 +262,22 @@ void udp_sock_setup(dns_thread_t* t) {
 
     const gdnsd_anysin_t* asin = &addrconf->addr;
 
-    // mod udp_recv_width down to 1 when unsupported, makes other logic simpler
-    // XXX fix this so addrconf can be const?????
-    if(!has_mmsg() && addrconf->udp_recv_width > 1)
+    if(!use_mmsg())
         addrconf->udp_recv_width = 1;
 
     const bool isv6 = asin->sa.sa_family == AF_INET6 ? true : false;
     gdnsd_assert(isv6 || asin->sa.sa_family == AF_INET);
 
-    const int sock = socket(isv6 ? PF_INET6 : PF_INET, SOCK_DGRAM, gdnsd_getproto_udp());
-    if(sock == -1) log_fatal("Failed to create IPv%c UDP socket: %s", isv6 ? '6' : '4', logf_errno());
-    if(fcntl(sock, F_SETFD, FD_CLOEXEC))
-        log_fatal("Failed to set FD_CLOEXEC on UDP socket: %s", logf_errno());
+    const int sock = socket(isv6 ? PF_INET6 : PF_INET, SOCK_DGRAM | SOCK_CLOEXEC, gdnsd_getproto_udp());
+    if(sock == -1)
+        log_fatal("Failed to create IPv%c UDP socket: %s", isv6 ? '6' : '4', logf_errno());
 
     const int opt_one = 1;
     if(setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &opt_one, sizeof opt_one) == -1)
         log_fatal("Failed to set SO_REUSEADDR on UDP socket: %s", logf_errno());
 
-#ifdef SO_REUSEPORT
-    if(gdnsd_reuseport_ok())
-        if(setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &opt_one, sizeof opt_one) == -1)
-            log_fatal("Failed to set SO_REUSEPORT on UDP socket: %s", logf_errno());
-#endif
+    if(setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &opt_one, sizeof opt_one) == -1)
+        log_fatal("Failed to set SO_REUSEPORT on UDP socket: %s", logf_errno());
 
     if(addrconf->udp_rcvbuf) {
         int opt_size = (int)addrconf->udp_rcvbuf;
@@ -419,17 +426,6 @@ static void mainloop(const int fd, void* dnsp_ctx, dnspacket_stats_t* stats, con
 
 #ifdef USE_SENDMMSG
 
-// check for linux 3.0+ for sendmmsg() (implies recvmmsg w/ MSG_WAITFORONE)
-static bool has_mmsg(void) {
-    bool rv = gdnsd_linux_min_version(3, 0, 0);
-    if(rv) {
-        /* this causes no harm and exits immediately */
-        sendmmsg(-1, 0, 0, 0);
-        rv = (errno != ENOSYS);
-    }
-    return rv;
-}
-
 F_HOT F_NONNULL
 static void mainloop_mmsg(const unsigned width, const int fd, void* dnsp_ctx, dnspacket_stats_t* stats, const bool use_cmsg) {
     const unsigned cmsg_size = use_cmsg ? CMSG_BUFSIZE : 1U;
@@ -576,10 +572,6 @@ static void mainloop_mmsg(const unsigned width, const int fd, void* dnsp_ctx, dn
         free(buf[i]);
 #endif
 }
-
-#else // USE_SENDMMSG
-
-static bool has_mmsg(void) { return false; }
 
 #endif // USE_SENDMMSG
 
