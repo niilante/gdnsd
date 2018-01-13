@@ -37,6 +37,7 @@ typedef union {
 #define REQ_INFO 'I'
 #define REQ_STAT 'S'
 #define REQ_STOP 'X'
+#define REQ_ZREL 'Z'
 #define RESP_ACK 'A'
 #define RESP_NAK 'N'
 
