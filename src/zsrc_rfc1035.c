@@ -41,24 +41,24 @@
 static char* rfc1035_dir = NULL;
 
 F_NONNULL
-static char* make_zone_name(const char* zf_name) {
+static char* make_zone_name(const char* zf_name)
+{
     unsigned zf_name_len = strlen(zf_name);
     char* out = NULL;
 
-    if(zf_name_len > 1004) {
+    if (zf_name_len > 1004) {
         log_err("rfc1035: Zone file name '%s' is illegal", zf_name);
-    }
-    else {
+    } else {
         // check for root zone...
-        if(unlikely(zf_name_len == 9 && !strncmp(zf_name, "ROOT_ZONE", 9))) { out = xmalloc(2);
+        if (unlikely(zf_name_len == 9 && !strncmp(zf_name, "ROOT_ZONE", 9))) {
+            out = xmalloc(2);
             out[0] = '.';
             out[1] = 0;
-        }
-        else {
+        } else {
             // convert all '@' to '/' for RFC2137 reverse delegation zones
             out = xmalloc(zf_name_len + 1);
-            for(unsigned i = 0; i <= zf_name_len; i++) {
-                if(unlikely(zf_name[i] == '@'))
+            for (unsigned i = 0; i <= zf_name_len; i++) {
+                if (unlikely(zf_name[i] == '@'))
                     out[i] = '/';
                 else
                     out[i] = zf_name[i];
@@ -70,9 +70,10 @@ static char* make_zone_name(const char* zf_name) {
 }
 
 F_NONNULL
-static zone_t* zone_from_zf(const char* fn, const char* full_fn) {
+static zone_t* zone_from_zf(const char* fn, const char* full_fn)
+{
     char* name = make_zone_name(fn);
-    if(!name)
+    if (!name)
         return NULL;
 
     char* src = gdnsd_str_combine("rfc1035:", fn, NULL);
@@ -80,8 +81,8 @@ static zone_t* zone_from_zf(const char* fn, const char* full_fn) {
     free(src);
     free(name);
 
-    if(z) {
-        if(zscan_rfc1035(z, full_fn) || zone_finalize(z)) {
+    if (z) {
+        if (zscan_rfc1035(z, full_fn) || zone_finalize(z)) {
             zone_delete(z);
             z = NULL;
         }
@@ -91,14 +92,15 @@ static zone_t* zone_from_zf(const char* fn, const char* full_fn) {
 }
 
 F_NONNULL
-static bool process_zonefile(ztree_t* tree, const char* zfn) {
+static bool process_zonefile(ztree_t* tree, const char* zfn)
+{
     const char* fn;
     char* full_fn = gdnsd_str_combine(rfc1035_dir, zfn, &fn);
     zone_t* z = zone_from_zf(fn, full_fn);
     free(full_fn);
 
-    if(z) {
-        if(!ztree_insert_zone(tree, z))
+    if (z) {
+        if (!ztree_insert_zone(tree, z))
             return false;
         zone_delete(z);
     }
@@ -110,12 +112,13 @@ static bool process_zonefile(ztree_t* tree, const char* zfn) {
 /*** Public interfaces ***/
 /*************************/
 
-bool zsrc_rfc1035_load_zones(ztree_t* tree) {
+bool zsrc_rfc1035_load_zones(ztree_t* tree)
+{
     gdnsd_assert(rfc1035_dir);
 
     DIR* zdhandle = opendir(rfc1035_dir);
-    if(!zdhandle) {
-        if(errno == ENOENT) {
+    if (!zdhandle) {
+        if (errno == ENOENT) {
             log_debug("rfc1035: Zones directory '%s' does not exist", rfc1035_dir);
             return false;
         }
@@ -129,20 +132,19 @@ bool zsrc_rfc1035_load_zones(ztree_t* tree) {
         errno = 0;
         // cppcheck-suppress readdirCalled
         result = readdir(zdhandle);
-        if(likely(result)) {
-            if(result->d_name[0] != '.') {
-                if(process_zonefile(tree, result->d_name))
+        if (likely(result)) {
+            if (result->d_name[0] != '.') {
+                if (process_zonefile(tree, result->d_name))
                     return true;
                 zone_count++;
             }
-        }
-        else if(errno) {
+        } else if (errno) {
             log_err("rfc1035: readdir(%s) failed: %s", rfc1035_dir, logf_errno());
             return true;
         }
-    } while(result);
+    } while (result);
 
-    if(closedir(zdhandle)) {
+    if (closedir(zdhandle)) {
         log_err("rfc1035: closedir(%s) failed: %s", rfc1035_dir, logf_errno());
         return true;
     }
@@ -151,6 +153,7 @@ bool zsrc_rfc1035_load_zones(ztree_t* tree) {
     return false;
 }
 
-void zsrc_rfc1035_init(void) {
+void zsrc_rfc1035_init(void)
+{
     rfc1035_dir = gdnsd_resolve_path_cfg("zones/", NULL);
 }

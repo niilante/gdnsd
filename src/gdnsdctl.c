@@ -46,47 +46,50 @@ static bool opt_syslog = false;
 static const char* opt_cfg_dir = NULL;
 
 F_NONNULL F_NORETURN
-static void usage(const char* argv0) {
+static void usage(const char* argv0)
+{
     fprintf(stderr,
-        "gdnsdctl version " PACKAGE_VERSION "\n"
-        "Usage: %s [-c %s] [-D] [-l] [-t %u] <action>\n"
-        "  -c - Configuration directory (def %s)\n"
-        "  -D - Enable verbose debug output\n"
-        "  -l - Send logs to syslog rather than stderr\n"
-        "  -t - Timeout in seconds (def %u, range %u - %u)\n"
-        "Actions:\n"
-        "  stop - Stops the running daemon\n"
-        "  reload-zones - Reload the running daemon's zone data\n"
-        "  replace - Ask daemon to spawn a takeover replacement of itself (updates code, config, zone data)\n"
-        "  status - Checks the running daemon's status\n"
-        "  stats - Dumps JSON statistics from the running daemon\n"
-        "\nFeatures: " BUILD_FEATURES
-        "\nBuild Info: " BUILD_INFO
-        "\nBug report URL: " PACKAGE_BUGREPORT
-        "\nGeneral info URL: " PACKAGE_URL
-        "\n",
-        argv0,
-        gdnsd_get_default_config_dir(), DEF_TIMEO,
-        gdnsd_get_default_config_dir(), DEF_TIMEO,
-        MIN_TIMEO, MAX_TIMEO
-    );
+            "gdnsdctl version " PACKAGE_VERSION "\n"
+            "Usage: %s [-c %s] [-D] [-l] [-t %u] <action>\n"
+            "  -c - Configuration directory (def %s)\n"
+            "  -D - Enable verbose debug output\n"
+            "  -l - Send logs to syslog rather than stderr\n"
+            "  -t - Timeout in seconds (def %u, range %u - %u)\n"
+            "Actions:\n"
+            "  stop - Stops the running daemon\n"
+            "  reload-zones - Reload the running daemon's zone data\n"
+            "  replace - Ask daemon to spawn a takeover replacement of itself (updates code, config, zone data)\n"
+            "  status - Checks the running daemon's status\n"
+            "  stats - Dumps JSON statistics from the running daemon\n"
+            "\nFeatures: " BUILD_FEATURES
+            "\nBuild Info: " BUILD_INFO
+            "\nBug report URL: " PACKAGE_BUGREPORT
+            "\nGeneral info URL: " PACKAGE_URL
+            "\n",
+            argv0,
+            gdnsd_get_default_config_dir(), DEF_TIMEO,
+            gdnsd_get_default_config_dir(), DEF_TIMEO,
+            MIN_TIMEO, MAX_TIMEO
+           );
     exit(2);
 }
 
 /**** Action functions ****/
 
 F_NONNULL
-static int action_stop(csc_t* csc) {
+static int action_stop(csc_t* csc)
+{
     return csc_stop_server(csc)
-        || csc_wait_stopping_server(csc);
+           || csc_wait_stopping_server(csc);
 }
 
 F_NONNULL
-static int action_reloadz(csc_t* csc) {
+static int action_reloadz(csc_t* csc)
+{
     csbuf_t req, resp;
     memset(&req, 0, sizeof(req));
     req.key = REQ_ZREL;
-    if(csc_txn(csc, &req, &resp)) {
+    if (csc_txn(csc, &req, &resp)) {
         log_err("Reload transaction failed!");
         return 1;
     }
@@ -95,7 +98,8 @@ static int action_reloadz(csc_t* csc) {
 }
 
 F_NONNULL
-static int action_replace(csc_t* csc) {
+static int action_replace(csc_t* csc)
+{
     const pid_t s_pid = csc_get_server_pid(csc);
     const char* s_vers = csc_get_server_version(csc);
     log_info("Existing daemon: version %s running at pid %li", s_vers, (long)s_pid);
@@ -103,12 +107,12 @@ static int action_replace(csc_t* csc) {
     csbuf_t req, resp;
     memset(&req, 0, sizeof(req));
     req.key = REQ_REPL;
-    if(csc_txn(csc, &req, &resp)) {
+    if (csc_txn(csc, &req, &resp)) {
         log_err("Replace command to old daemon failed");
         return 1;
     }
 
-    if(csc_wait_stopping_server(csc)) {
+    if (csc_wait_stopping_server(csc)) {
         log_err("Replace command to old daemon succeeded, but old daemon never finished exiting...");
         return 1;
     }
@@ -122,7 +126,8 @@ static int action_replace(csc_t* csc) {
 }
 
 F_NONNULL
-static int action_status(csc_t* csc) {
+static int action_status(csc_t* csc)
+{
     const pid_t s_pid = csc_get_server_pid(csc);
     const char* s_vers = csc_get_server_version(csc);
     log_info("version %s running at pid %li", s_vers, (long)s_pid);
@@ -130,12 +135,13 @@ static int action_status(csc_t* csc) {
 }
 
 F_NONNULL
-static int action_stats(csc_t* csc) {
+static int action_stats(csc_t* csc)
+{
     char* resp_data;
     csbuf_t req, resp;
     memset(&req, 0, sizeof(req));
     req.key = REQ_STAT;
-    if(csc_txn_getdata(csc, &req, &resp, &resp_data))
+    if (csc_txn_getdata(csc, &req, &resp, &resp_data))
         return 1;
     fwrite(resp_data, 1, resp.d, stdout);
     free(resp_data);
@@ -158,51 +164,54 @@ static struct {
 };
 
 F_NONNULL F_PURE F_RETNN
-static afunc_t match_action(const char* argv0, const char* match) {
+static afunc_t match_action(const char* argv0, const char* match)
+{
     unsigned i;
-    for(i = 0; i < ARRAY_SIZE(actionmap); i++)
-        if(!strcasecmp(actionmap[i].cmdstring, match))
+    for (i = 0; i < ARRAY_SIZE(actionmap); i++)
+        if (!strcasecmp(actionmap[i].cmdstring, match))
             return actionmap[i].func;
     usage(argv0);
 }
 
 F_NONNULL F_RETNN
-static afunc_t parse_args(const int argc, char** argv) {
+static afunc_t parse_args(const int argc, char** argv)
+{
     unsigned long timeo;
     int optchar;
-    while((optchar = getopt(argc, argv, "c:Dlt:"))) {
-        switch(optchar) {
-            case 'c':
-                opt_cfg_dir = optarg;
-                break;
-            case 'D':
-                opt_debug = true;
-                break;
-            case 'l':
-                opt_syslog = true;
-                break;
-            case 't':
-                errno = 0;
-                timeo = strtoul(optarg, NULL, 10);
-                if(errno || timeo < MIN_TIMEO || timeo > MAX_TIMEO)
-                    usage(argv[0]);
-                opt_timeo = (unsigned)timeo;
-                break;
-            case -1:
-                if(optind != (argc - 1))
-                    usage(argv[0]);
-                return match_action(argv[0], argv[optind]);
-                break;
-            default:
+    while ((optchar = getopt(argc, argv, "c:Dlt:"))) {
+        switch (optchar) {
+        case 'c':
+            opt_cfg_dir = optarg;
+            break;
+        case 'D':
+            opt_debug = true;
+            break;
+        case 'l':
+            opt_syslog = true;
+            break;
+        case 't':
+            errno = 0;
+            timeo = strtoul(optarg, NULL, 10);
+            if (errno || timeo < MIN_TIMEO || timeo > MAX_TIMEO)
                 usage(argv[0]);
-                break;
+            opt_timeo = (unsigned)timeo;
+            break;
+        case -1:
+            if (optind != (argc - 1))
+                usage(argv[0]);
+            return match_action(argv[0], argv[optind]);
+            break;
+        default:
+            usage(argv[0]);
+            break;
         }
     }
 
     usage(argv[0]);
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv)
+{
     umask(022);
     afunc_t action_func = parse_args(argc, argv);
     gdnsd_assert(action_func);

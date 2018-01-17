@@ -1,0 +1,12 @@
+mode=c
+style=kr
+convert-tabs
+pad-oper
+pad-header
+unpad-paren
+break-one-line-headers
+align-pointer=type
+align-reference=name
+indent-labels
+lineend=linux
+#max-code-length=120 # should reduce overlong string constants in general first, manually... XXX
