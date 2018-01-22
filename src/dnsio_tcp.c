@@ -29,7 +29,6 @@
 #include <gdnsd/log.h>
 #include <gdnsd/misc.h>
 #include <gdnsd/net.h>
-#include <gdnsd/prcu.h>
 
 #include <netdb.h>
 #include <unistd.h>
@@ -41,6 +40,7 @@
 #include <netinet/tcp.h>
 
 #include <ev.h>
+#include <urcu-qsbr.h>
 
 typedef enum {
     READING_INITIAL = 0,
@@ -59,7 +59,7 @@ typedef struct {
     unsigned timeout;
     unsigned max_clients;
     unsigned num_conn_watchers;
-    bool prcu_online;
+    bool rcu_is_online;
     bool shutting_down;
 } tcpdns_thread_t;
 
@@ -258,9 +258,9 @@ static void tcp_read_handler(struct ev_loop* loop, ev_io* w, const int revents V
     }
 
     //  Process the query and start the writer
-    if (!tdata->ctx->prcu_online) {
-        tdata->ctx->prcu_online = true;
-        gdnsd_prcu_rdr_online();
+    if (!tdata->ctx->rcu_is_online) {
+        tdata->ctx->rcu_is_online = true;
+        rcu_thread_online();
     }
     tdata->size = process_dns_query(tdata->ctx->dnsp_ctx, tdata->ctx->stats, &tdata->asin, &tdata->buffer[2], tdata->size - 2);
     if (!tdata->size) {
@@ -424,12 +424,12 @@ void tcp_dns_listen_setup(dns_thread_t* t)
         socks_bind_sock("TCP DNS", t->sock, asin);
 }
 
-static void prcu_offline(struct ev_loop* loop V_UNUSED, ev_prepare* w V_UNUSED, int revents V_UNUSED)
+static void set_rcu_offline(struct ev_loop* loop V_UNUSED, ev_prepare* w V_UNUSED, int revents V_UNUSED)
 {
     tcpdns_thread_t* ctx = w->data;
-    if (ctx->prcu_online) {
-        ctx->prcu_online = false;
-        gdnsd_prcu_rdr_offline();
+    if (ctx->rcu_is_online) {
+        ctx->rcu_is_online = false;
+        rcu_thread_offline();
     }
 }
 
@@ -463,7 +463,7 @@ void* dnsio_tcp_start(void* thread_asvoid)
     accept_watcher->data = ctx;
 
     ev_prepare* prep_watcher = &ctx->prep_watcher;
-    ev_prepare_init(prep_watcher, prcu_offline);
+    ev_prepare_init(prep_watcher, set_rcu_offline);
     prep_watcher->data = ctx;
 
     ev_async* stop_watcher = &ctx->stop_watcher;
@@ -479,12 +479,12 @@ void* dnsio_tcp_start(void* thread_asvoid)
     ev_io_start(loop, accept_watcher);
     ev_prepare_start(loop, prep_watcher);
 
-    gdnsd_prcu_rdr_thread_start();
-    ctx->prcu_online = true;
+    rcu_register_thread();
+    ctx->rcu_is_online = true;
 
     ev_run(loop, 0);
 
-    gdnsd_prcu_rdr_thread_end();
+    rcu_unregister_thread();
 
     // de-allocate explicitly when debugging, for leaks
 #ifndef NDEBUG
