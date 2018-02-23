@@ -36,7 +36,7 @@ example.com:
   ns1.subz	A	192.0.2.5
   ns2.subz	A	192.0.2.6
 
-  www	600/10	DYNA	some_plugin!resource_name
+  www	600	DYNA	some_plugin!resource_name
   alias		CNAME	www
 
   _http._tcp	1800	SRV	5 500 80 www
@@ -161,37 +161,6 @@ Example:
   ;  'www'.  No other RRs of any type for name 'foo' are
   ;  legal alongside this record.
   foo DYNC geoip!www
-
-=head2 DYNA/DYNC TTLs
-
-C<DYNA> and C<DYNC> TTL fields have a syntax extension and slightly
-different meanings than the TTL field of a traditional, fixed RR.
-The format for DYNA/DYNC TTLs is C<MAX[/MIN]>, with C<MIN> defaulting
-to half of C<MAX> if not specified explicitly.
-
-Based on the configuration and state of the underlying monitored services,
-(see "service_types" in L<gdnsd.config(8)>), gdnsd knows the minimum time
-to the next possible state-change which could affect a given C<DYNA> or
-C<DYNC> result.  For example, given the configuration and state, it may
-be known that in order for a currently C<DOWN> address to transition to
-the C<UP> state (and thus change the answer to a given query) would require
-7 more successful monitoring checks in a row at 8-second intervals, and
-therefore cannot happen in less than 56 seconds.  In this case 56 seconds
-would be the internally-calculated TTL.
-
-In cases where multiple monitored resources factor into a plugin's
-decision and/or response (e.g. multifo), the calculated TTL will generally
-be the minimum of all involved internal monitoring TTLs.  This calculated
-TTL is then clamped to the C<MAX> and C<MIN> limits from the zonefile.
-
-Examples:
-
-    ; Explicit range of 30 - 300:
-    www 300/30 DYNC weighted!foo
-    ; Implicit range of 150 - 300:
-    www 300 DYNA metafo!myservice
-    ; Avoid all TTL-mangling and use a fixed value of 10 minutes:
-    www 600/600 DYNA geoip!foo-dist
 
 =head2 TXT data auto-splitting
 

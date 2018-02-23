@@ -384,7 +384,7 @@ bool ltree_add_rec_aaaa(const zone_t* zone, const uint8_t* dname, const uint8_t*
     return false;
 }
 
-bool ltree_add_rec_dynaddr(const zone_t* zone, const uint8_t* dname, const char* rhs, unsigned ttl, unsigned ttl_min, const unsigned limit_v4, const unsigned limit_v6, const bool ooz)
+bool ltree_add_rec_dynaddr(const zone_t* zone, const uint8_t* dname, const char* rhs, unsigned ttl, const unsigned limit_v4, const unsigned limit_v6, const bool ooz)
 {
     ltree_node_t* node;
     if (ooz) {
@@ -402,18 +402,9 @@ bool ltree_add_rec_dynaddr(const zone_t* zone, const uint8_t* dname, const char*
     }
 
     CLAMP_TTL("DYNA")
-    if (ttl_min < gcfg->min_ttl) {
-        log_zwarn("Name '%s%s': DYNA Min-TTL /%u too small, clamped to min_ttl setting of %u", logf_dname(dname), logf_dname(zone->dname), ttl_min, gcfg->min_ttl);
-        ttl_min = gcfg->min_ttl;
-    }
-    if (ttl_min > ttl) {
-        log_zwarn("Name '%s%s': DYNA Min-TTL /%u larger than Max-TTL %u, clamping to Max-TTL", logf_dname(dname), logf_dname(zone->dname), ttl_min, ttl);
-        ttl_min = ttl;
-    }
 
     rrset = ltree_node_add_rrset_addr(node);
     rrset->gen.ttl = htonl(ttl);
-    rrset->dyn.ttl_min = ttl_min;
     rrset->limit_v4 = limit_v4;
     rrset->limit_v6 = limit_v6;
 
@@ -456,24 +447,14 @@ bool ltree_add_rec_cname(const zone_t* zone, const uint8_t* dname, const uint8_t
     return false;
 }
 
-bool ltree_add_rec_dync(const zone_t* zone, const uint8_t* dname, const char* rhs, const uint8_t* origin, unsigned ttl, unsigned ttl_min, const unsigned limit_v4, const unsigned limit_v6)
+bool ltree_add_rec_dync(const zone_t* zone, const uint8_t* dname, const char* rhs, const uint8_t* origin, unsigned ttl, const unsigned limit_v4, const unsigned limit_v6)
 {
     CLAMP_TTL("DYNC")
-
-    if (ttl_min < gcfg->min_ttl) {
-        log_zwarn("Name '%s%s': DYNC Min-TTL /%u too small, clamped to min_ttl setting of %u", logf_dname(dname), logf_dname(zone->dname), ttl_min, gcfg->min_ttl);
-        ttl_min = gcfg->min_ttl;
-    }
-    if (ttl_min > ttl) {
-        log_zwarn("Name '%s%s': DYNC Min-TTL /%u larger than Max-TTL %u, clamping to Max-TTL", logf_dname(dname), logf_dname(zone->dname), ttl_min, ttl);
-        ttl_min = ttl;
-    }
 
     ltree_node_t* node = ltree_find_or_add_dname(zone, dname);
     ltree_rrset_dync_t* rrset = ltree_node_add_rrset_dync(node);
     rrset->origin = lta_dnamedup(zone->arena, origin);
     rrset->gen.ttl = htonl(ttl);
-    rrset->ttl_min = ttl_min;
     rrset->limit_v4 = limit_v4;
     rrset->limit_v6 = limit_v6;
 

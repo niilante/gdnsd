@@ -836,25 +836,15 @@ static unsigned enc_aaaa_dynamic(dnsp_ctx_t* ctx, unsigned offset, const ltree_r
 }
 
 // Invoke dyna callback for DYN[AC], taking care of zeroing
-//   out ctx->dyn and cleaning up the ttl + scope_mask issues,
-//   returning the TTL to actually use, in network order.
+//   out ctx->dyn and cleaning up the scope_mask issues.
 F_NONNULLX(1, 2)
-static unsigned do_dyn_callback(dnsp_ctx_t* ctx, gdnsd_resolve_cb_t func, const uint8_t* origin, const unsigned res, const unsigned ttl_max_net, const unsigned ttl_min)
+static void do_dyn_callback(dnsp_ctx_t* ctx, gdnsd_resolve_cb_t func, const uint8_t* origin, const unsigned res)
 {
     dyn_result_t* dr = ctx->dyn;
     memset(dr, 0, sizeof(*dr));
-    const gdnsd_sttl_t sttl = func(res, origin, &ctx->client_info, dr);
+    func(res, origin, &ctx->client_info, dr);
     if (dr->edns_scope_mask > ctx->edns_client_scope_mask)
         ctx->edns_client_scope_mask = dr->edns_scope_mask;
-    assert_valid_sttl(sttl);
-    unsigned ttl = sttl & GDNSD_STTL_TTL_MASK;
-    if (ttl > ntohl(ttl_max_net))
-        ttl = ttl_max_net;
-    else if (ttl < ttl_min)
-        ttl = htonl(ttl_min);
-    else
-        ttl = htonl(ttl);
-    return ttl;
 }
 
 F_NONNULL
@@ -871,12 +861,12 @@ static unsigned encode_rrs_anyaddr(dnsp_ctx_t* ctx, unsigned offset, const ltree
         if (rrset->count_v6)
             offset = enc_aaaa_static(ctx, offset, rrset, nameptr, is_addtl);
     } else {
-        const unsigned ttl = do_dyn_callback(ctx, rrset->dyn.func, NULL, rrset->dyn.resource, rrset->gen.ttl, rrset->dyn.ttl_min);
+        do_dyn_callback(ctx, rrset->dyn.func, NULL, rrset->dyn.resource);
         gdnsd_assert(!ctx->dyn->is_cname);
         if (ctx->dyn->count_v4)
-            offset = enc_a_dynamic(ctx, offset, rrset, nameptr, is_addtl, ttl);
+            offset = enc_a_dynamic(ctx, offset, rrset, nameptr, is_addtl, rrset->gen.ttl);
         if (ctx->dyn->count_v6)
-            offset = enc_aaaa_dynamic(ctx, offset, rrset, nameptr, is_addtl, ttl);
+            offset = enc_aaaa_dynamic(ctx, offset, rrset, nameptr, is_addtl, rrset->gen.ttl);
     }
 
     return offset;
@@ -948,13 +938,13 @@ static unsigned encode_rrs_a(dnsp_ctx_t* ctx, unsigned offset, const ltree_rrset
             ctx->addtl_offset = enc_aaaa_static(ctx, ctx->addtl_offset, rrset, ctx->qname_comp, true);
         }
     } else {
-        const unsigned ttl = do_dyn_callback(ctx, rrset->dyn.func, NULL, rrset->dyn.resource, rrset->gen.ttl, rrset->dyn.ttl_min);
+        do_dyn_callback(ctx, rrset->dyn.func, NULL, rrset->dyn.resource);
         gdnsd_assert(!ctx->dyn->is_cname);
         if (ctx->dyn->count_v4)
-            offset = enc_a_dynamic(ctx, offset, rrset, ctx->qname_comp, false, ttl);
+            offset = enc_a_dynamic(ctx, offset, rrset, ctx->qname_comp, false, rrset->gen.ttl);
         if (ctx->dyn->count_v6) {
             track_addtl_rrset_unwind(ctx, rrset);
-            ctx->addtl_offset = enc_aaaa_dynamic(ctx, ctx->addtl_offset, rrset, ctx->qname_comp, true, ttl);
+            ctx->addtl_offset = enc_aaaa_dynamic(ctx, ctx->addtl_offset, rrset, ctx->qname_comp, true, rrset->gen.ttl);
         }
     }
 
@@ -979,13 +969,13 @@ static unsigned encode_rrs_aaaa(dnsp_ctx_t* ctx, unsigned offset, const ltree_rr
             ctx->addtl_offset = enc_a_static(ctx, ctx->addtl_offset, rrset, ctx->qname_comp, true);
         }
     } else {
-        const unsigned ttl = do_dyn_callback(ctx, rrset->dyn.func, NULL, rrset->dyn.resource, rrset->gen.ttl, rrset->dyn.ttl_min);
+        do_dyn_callback(ctx, rrset->dyn.func, NULL, rrset->dyn.resource);
         gdnsd_assert(!ctx->dyn->is_cname);
         if (ctx->dyn->count_v6)
-            offset = enc_aaaa_dynamic(ctx, offset, rrset, ctx->qname_comp, false, ttl);
+            offset = enc_aaaa_dynamic(ctx, offset, rrset, ctx->qname_comp, false, rrset->gen.ttl);
         if (ctx->dyn->count_v4) {
             track_addtl_rrset_unwind(ctx, rrset);
-            ctx->addtl_offset = enc_a_dynamic(ctx, ctx->addtl_offset, rrset, ctx->qname_comp, true, ttl);
+            ctx->addtl_offset = enc_a_dynamic(ctx, ctx->addtl_offset, rrset, ctx->qname_comp, true, rrset->gen.ttl);
         }
     }
 
@@ -1774,7 +1764,7 @@ static const ltree_rrset_t* process_dync(dnsp_ctx_t* ctx, const ltree_rrset_dync
 {
     gdnsd_assert(!rd->gen.next); // DYNC does not co-exist with other rrsets
 
-    const unsigned ttl = do_dyn_callback(ctx, rd->func, rd->origin, rd->resource, rd->gen.ttl, rd->ttl_min);
+    do_dyn_callback(ctx, rd->func, rd->origin, rd->resource);
     dyn_result_t* dr = ctx->dyn;
 
     if (dr->is_cname) {
@@ -1784,7 +1774,7 @@ static const ltree_rrset_t* process_dync(dnsp_ctx_t* ctx, const ltree_rrset_dync
         dname_copy(cn_store, dr->storage);
         ctx->dync_synth_rrset.gen.type = DNS_TYPE_CNAME;
         ctx->dync_synth_rrset.gen.count = 1;
-        ctx->dync_synth_rrset.gen.ttl = ttl;
+        ctx->dync_synth_rrset.gen.ttl = rd->gen.ttl;
         ctx->dync_synth_rrset.cname.dname = cn_store;
     } else if (dr->count_v4 + dr->count_v6) {
         // ^ If both counts are zero, must represent this as
@@ -1799,7 +1789,7 @@ static const ltree_rrset_t* process_dync(dnsp_ctx_t* ctx, const ltree_rrset_dync
             lv6 = dr->count_v6;
 
         ctx->dync_synth_rrset.gen.type = DNS_TYPE_A;
-        ctx->dync_synth_rrset.gen.ttl = ttl;
+        ctx->dync_synth_rrset.gen.ttl = rd->gen.ttl;
         ctx->dync_synth_rrset.addr.count_v6 = dr->count_v6;
         ctx->dync_synth_rrset.gen.count = dr->count_v4;
         if (!dr->count_v6 && dr->count_v4 <= LTREE_V4A_SIZE) {
